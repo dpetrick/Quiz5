@@ -21,26 +21,30 @@ fn main() {
     // This is an infinite iterator
     for stream in listener.incoming() {
         let storage = Arc::clone(&storage);
-        let mut stream = stream.unwrap();
-        let mut read_buffer = String::new();
-        let mut buffered_stream = BufReader::new(&stream);
-        if let Err(_) = buffered_stream.read_line(&mut read_buffer) {
-            break;
-        }
-
-        let cmd = db::parse(&read_buffer);
         pool.queue(move || {
-            let mut storage = storage.lock().expect("Tainted mutex! Oh no!");
-            match cmd {
-                Ok(Command::Get) => send_reply(
-                    &mut stream,
-                    storage.get().unwrap_or_else(|| "<empty>".into()),
-                ),
-                Ok(Command::Pub(s)) => {
-                    storage.store(s);
-                    send_reply(&mut stream, "<done>");
+            let mut stream = stream.unwrap();
+
+            loop {
+                let mut read_buffer = String::new();
+                let mut buffered_stream = BufReader::new(&stream);
+                if let Err(_) = buffered_stream.read_line(&mut read_buffer) {
+                    break;
                 }
-                Err(e) => send_reply(&mut stream, format!("<error: {:?}>", e)),
+
+                let cmd = db::parse(&read_buffer);
+
+                let mut storage = storage.lock().expect("Tainted mutex! Oh no!");
+                match cmd {
+                    Ok(Command::Get) => send_reply(
+                        &mut stream,
+                        storage.get().unwrap_or_else(|| "<empty>".into()),
+                    ),
+                    Ok(Command::Pub(s)) => {
+                        storage.store(s);
+                        send_reply(&mut stream, "<done>");
+                    }
+                    Err(e) => send_reply(&mut stream, format!("<error: {:?}>", e)),
+                }
             }
         });
     }

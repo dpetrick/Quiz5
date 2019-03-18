@@ -65,6 +65,7 @@ struct Worker {
   _signal_queue: crossbeam_deque::Worker<Signal>,
 }
 
+// This is WIP. Thread shutdown requires additional considerations.
 impl Worker {
   fn new(_id: usize, injector: Arc<Injector<Job>>) -> Self {
     let injector = Arc::clone(&injector);
